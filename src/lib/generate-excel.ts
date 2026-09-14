@@ -11,7 +11,8 @@ export interface HeaderInfo {
   version: string;
 }
 
-export type FieldValues = Record<string, string>;
+/** Map of measuring point (as string) -> resolved export value. */
+export type MpValues = Record<string, string>;
 
 const THIN_BORDER: Partial<ExcelJS.Borders> = {
   top: { style: "thin", color: { argb: "FF808080" } },
@@ -43,7 +44,7 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 
 async function tryLoadLogo(): Promise<{ base64: string; extension: "png" | "jpeg" } | null> {
   try {
-    const res = await fetch("/logo.png");
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/logo.png`);
     if (!res.ok) return null;
     const blob = await res.blob();
     if (blob.size === 0) return null;
@@ -54,7 +55,7 @@ async function tryLoadLogo(): Promise<{ base64: string; extension: "png" | "jpeg
   }
 }
 
-export async function generateShiftLogWorkbook(header: HeaderInfo, values: FieldValues): Promise<Blob> {
+export async function generateShiftLogWorkbook(header: HeaderInfo, mpValues: MpValues): Promise<Blob> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet(header.stationName || "Shift Log", {
     views: [{ state: "frozen", ySplit: 6 }],
@@ -175,11 +176,9 @@ export async function generateShiftLogWorkbook(header: HeaderInfo, values: Field
     r++;
   };
 
-  const powerFactor = values["powerFactor"] ?? "";
-
   for (const group of EQUIPMENT_GROUPS) {
     for (const dataRow of group.rows) {
-      const value = dataRow.shared === "powerFactor" ? powerFactor : dataRow.fieldKey ? values[dataRow.fieldKey] ?? "" : dataRow.fixedValue ?? "";
+      const value = mpValues[dataRow.mp] ?? dataRow.fixedValue ?? "";
       writeDataRow(dataRow.equipment, dataRow.unit, dataRow.mpDescription, dataRow.mp, value, dataRow.valuationCode);
     }
   }

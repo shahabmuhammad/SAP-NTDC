@@ -7,12 +7,7 @@ export interface DataRow {
   mpDescription: string;
   mp: string;
   valuationCode: number;
-  editable: boolean;
-  /** Unique key used to look up the user-entered value. Absent for fixed/shared rows. */
-  fieldKey?: string;
-  /** When set, the row's value comes from the single shared Power Factor input. */
-  shared?: "powerFactor";
-  /** Fixed value used when the row is not user-editable (status rows, shared PF placeholder). */
+  /** Fixed value used for rows that are not derived from form input (status rows). */
   fixedValue?: string | number;
 }
 
@@ -25,35 +20,35 @@ export interface EquipmentGroup {
 function transformerGroup(equipment: string, mpBase: number): DataRow[] {
   const n = (offset: number) => String(mpBase + offset);
   return [
-    { equipment, unit: "A", mpDescription: "HV LOAD (AMP)", mp: n(0), valuationCode: 1, editable: true, fieldKey: n(0) },
-    { equipment, unit: "A", mpDescription: "LV LOAD (AMP)", mp: n(1), valuationCode: 1, editable: true, fieldKey: n(1) },
-    { equipment, unit: "MW", mpDescription: "REAL POWER FLOW (MW)", mp: n(2), valuationCode: 1, editable: true, fieldKey: n(2) },
-    { equipment, unit: "MVAR", mpDescription: "REACTIVE P F (MVAR)", mp: n(3), valuationCode: 1, editable: true, fieldKey: n(3) },
-    { equipment, unit: "", mpDescription: "POWER FACTOR", mp: n(4), valuationCode: 1, editable: false, shared: "powerFactor" },
-    { equipment, unit: "°C", mpDescription: "OIL TEMP HV", mp: n(5), valuationCode: 1, editable: true, fieldKey: n(5) },
-    { equipment, unit: "°C", mpDescription: "OIL TEMP LV", mp: n(6), valuationCode: 1, editable: true, fieldKey: n(6) },
-    { equipment, unit: "°C", mpDescription: "WDG TEMP HV", mp: n(7), valuationCode: 1, editable: true, fieldKey: n(7) },
-    { equipment, unit: "°C", mpDescription: "WDG TEMP LV", mp: n(8), valuationCode: 1, editable: true, fieldKey: n(8) },
-    { equipment, unit: "EA", mpDescription: "TAP POSITION", mp: n(9), valuationCode: 1, editable: true, fieldKey: n(9) },
+    { equipment, unit: "A", mpDescription: "HV LOAD (AMP)", mp: n(0), valuationCode: 1 },
+    { equipment, unit: "A", mpDescription: "LV LOAD (AMP)", mp: n(1), valuationCode: 1 },
+    { equipment, unit: "MW", mpDescription: "REAL POWER FLOW (MW)", mp: n(2), valuationCode: 1 },
+    { equipment, unit: "MVAR", mpDescription: "REACTIVE P F (MVAR)", mp: n(3), valuationCode: 1 },
+    { equipment, unit: "", mpDescription: "POWER FACTOR", mp: n(4), valuationCode: 1 },
+    { equipment, unit: "°C", mpDescription: "OIL TEMP HV", mp: n(5), valuationCode: 1 },
+    { equipment, unit: "°C", mpDescription: "OIL TEMP LV", mp: n(6), valuationCode: 1 },
+    { equipment, unit: "°C", mpDescription: "WDG TEMP HV", mp: n(7), valuationCode: 1 },
+    { equipment, unit: "°C", mpDescription: "WDG TEMP LV", mp: n(8), valuationCode: 1 },
+    { equipment, unit: "EA", mpDescription: "TAP POSITION", mp: n(9), valuationCode: 1 },
   ];
 }
 
 function feederGroup(equipment: string, mpBase: number, realPowerCode = 1): DataRow[] {
   const n = (offset: number) => String(mpBase + offset);
   return [
-    { equipment, unit: "kV", mpDescription: "VOLTAGE KV", mp: n(0), valuationCode: 1, editable: true, fieldKey: n(0) },
-    { equipment, unit: "MW", mpDescription: "REAL POWER I/E", mp: n(1), valuationCode: realPowerCode, editable: true, fieldKey: n(1) },
-    { equipment, unit: "MVAR", mpDescription: "REACTIVE POWER I/E", mp: n(2), valuationCode: 1, editable: true, fieldKey: n(2) },
-    { equipment, unit: "", mpDescription: "POWER FACTOR", mp: n(3), valuationCode: 1, editable: false, shared: "powerFactor" },
-    { equipment, unit: "A", mpDescription: "LOAD (AMP)", mp: n(4), valuationCode: 1, editable: true, fieldKey: n(4) },
+    { equipment, unit: "kV", mpDescription: "VOLTAGE KV", mp: n(0), valuationCode: 1 },
+    { equipment, unit: "MW", mpDescription: "REAL POWER I/E", mp: n(1), valuationCode: realPowerCode },
+    { equipment, unit: "MVAR", mpDescription: "REACTIVE POWER I/E", mp: n(2), valuationCode: 1 },
+    { equipment, unit: "", mpDescription: "POWER FACTOR", mp: n(3), valuationCode: 1 },
+    { equipment, unit: "A", mpDescription: "LOAD (AMP)", mp: n(4), valuationCode: 1 },
   ];
 }
 
 function chargerGroup(equipment: string, mpBase: number): DataRow[] {
   const n = (offset: number) => String(mpBase + offset);
   return [
-    { equipment, unit: "V", mpDescription: "DC VOLTAGE (VDC)", mp: n(0), valuationCode: 1, editable: true, fieldKey: n(0) },
-    { equipment, unit: "A", mpDescription: "DC CURRENT (A)", mp: n(1), valuationCode: 1, editable: true, fieldKey: n(1) },
+    { equipment, unit: "V", mpDescription: "DC VOLTAGE (VDC)", mp: n(0), valuationCode: 1 },
+    { equipment, unit: "A", mpDescription: "DC CURRENT (A)", mp: n(1), valuationCode: 1 },
   ];
 }
 
@@ -62,12 +57,12 @@ export const EQUIPMENT_GROUPS: EquipmentGroup[] = [
     id: "grid",
     title: "220kV Grid Station NGCP Mardan / Bus Bars",
     rows: [
-      { equipment: "220kV Grid Station NGCP Mardan", unit: "Hz", mpDescription: "FREQUENCY (HZ)", mp: "23701", valuationCode: 1, editable: true, fieldKey: "23701" },
-      { equipment: "220kV Grid Station NGCP Mardan", unit: "°C", mpDescription: "TEMPERATURE/WEATHER", mp: "23702", valuationCode: 21, editable: true, fieldKey: "23702" },
-      { equipment: "MRN 220kV Bus Bar 1", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23724", valuationCode: 1, editable: true, fieldKey: "23724" },
-      { equipment: "MRN 220kV Bus Bar 2", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23723", valuationCode: 1, editable: true, fieldKey: "23723" },
-      { equipment: "MRN 132kV Bus Bar 1", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23806", valuationCode: 1, editable: true, fieldKey: "23806" },
-      { equipment: "MRN 132kV Bus Bar 2", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23805", valuationCode: 1, editable: true, fieldKey: "23805" },
+      { equipment: "220kV Grid Station NGCP Mardan", unit: "Hz", mpDescription: "FREQUENCY (HZ)", mp: "23701", valuationCode: 1 },
+      { equipment: "220kV Grid Station NGCP Mardan", unit: "°C", mpDescription: "TEMPERATURE/WEATHER", mp: "23702", valuationCode: 21 },
+      { equipment: "MRN 220kV Bus Bar 1", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23724", valuationCode: 1 },
+      { equipment: "MRN 220kV Bus Bar 2", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23723", valuationCode: 1 },
+      { equipment: "MRN 132kV Bus Bar 1", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23806", valuationCode: 1 },
+      { equipment: "MRN 132kV Bus Bar 2", unit: "kV", mpDescription: "VOLTAGE KV", mp: "23805", valuationCode: 1 },
     ],
   },
   { id: "t1", title: "MRN 220/132kV 250MVA T-1 (D7Q1/E5Q1)", rows: transformerGroup("MRN 220/132kV 250MVA T-1 D7Q1/E5Q1", 23745) },
@@ -224,16 +219,5 @@ export const STATUS_ROWS: DataRow[] = STATUS_ITEMS.map(([equipment, mp, value]) 
   mpDescription: "OPEN / CLOSE STATUS",
   mp: String(mp),
   valuationCode: 1,
-  editable: false,
   fixedValue: value,
 }));
-
-export function allEditableFieldKeys(): string[] {
-  const keys: string[] = [];
-  for (const group of EQUIPMENT_GROUPS) {
-    for (const row of group.rows) {
-      if (row.editable && row.fieldKey) keys.push(row.fieldKey);
-    }
-  }
-  return keys;
-}

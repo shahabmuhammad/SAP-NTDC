@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { useMemo } from "react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,8 +19,10 @@ import { Badge } from "@/components/ui/badge";
 import { EQUIPMENT_GROUPS, STATUS_ROWS } from "@/lib/sap-data";
 import { downloadBlob, generateShiftLogWorkbook, type HeaderInfo } from "@/lib/generate-excel";
 import { halfHourTimeOptions } from "@/lib/time-options";
+import { DERIVED_HINTS, emptyFieldState, recompute, type FieldState } from "@/lib/derivation";
 
 const SHIFTS = ["Morning", "Evening", "Night"] as const;
+const GRID_GROUP_ID = "grid";
 
 function todayIsoDate() {
   const d = new Date();
@@ -27,6 +30,33 @@ function todayIsoDate() {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function NumberField({
+  id,
+  label,
+  unit,
+  value,
+  hint,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  unit?: string;
+  value: string;
+  hint?: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={id}>
+        {label}
+        {unit ? <span className="text-muted-foreground"> ({unit})</span> : null}
+      </Label>
+      <Input id={id} inputMode="decimal" placeholder="0" value={value} onChange={(e) => onChange(e.target.value)} />
+      {hint ? <p className="text-muted-foreground text-xs">{hint}, editable</p> : null}
+    </div>
+  );
 }
 
 export function ShiftLogForm() {
@@ -43,18 +73,25 @@ export function ShiftLogForm() {
   });
 
   const [powerFactor, setPowerFactor] = useState("0.99");
-  const [values, setValues] = useState<Record<string, string>>({});
+  const [fieldState, setFieldState] = useState<FieldState>(() => emptyFieldState());
   const [isGenerating, setIsGenerating] = useState(false);
-
-  const setValue = (key: string, val: string) => setValues((prev) => ({ ...prev, [key]: val }));
 
   const updateHeader = <K extends keyof HeaderInfo>(key: K, val: HeaderInfo[K]) =>
     setHeader((prev) => ({ ...prev, [key]: val }));
 
+  const setFieldValue = (mp: string, val: string) => {
+    setFieldState((prev) => recompute({ ...prev.values, [mp]: val }, prev.lastAuto, powerFactor));
+  };
+
+  const updatePowerFactor = (val: string) => {
+    setPowerFactor(val);
+    setFieldState((prev) => recompute(prev.values, prev.lastAuto, val));
+  };
+
   async function handleDownload() {
     setIsGenerating(true);
     try {
-      const blob = await generateShiftLogWorkbook(header, { ...values, powerFactor });
+      const blob = await generateShiftLogWorkbook(header, fieldState.values);
       const dateForFile = header.date || "date";
       const filename = `${header.stationName.replace(/\s+/g, "_")}_${dateForFile}_${header.shift}.xlsx`;
       downloadBlob(blob, filename);
@@ -63,12 +100,16 @@ export function ShiftLogForm() {
     }
   }
 
+  const gridGroup = EQUIPMENT_GROUPS.find((g) => g.id === GRID_GROUP_ID)!;
+  const otherGroups = EQUIPMENT_GROUPS.filter((g) => g.id !== GRID_GROUP_ID);
+
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-10">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{header.stationName} Shift Log</h1>
         <p className="text-muted-foreground mt-1 text-sm">
-          Fill in the shift details and readings below, then download the formatted Excel sheet.
+          Fill in the shift details and readings below, then download the formatted Excel sheet. Fields marked with
+          a hint are pre-filled automatically but can be overridden at any time.
         </p>
       </div>
 
@@ -91,7 +132,7 @@ export function ShiftLogForm() {
             <Label htmlFor="employeeName">Employee Name</Label>
             <Input
               id="employeeName"
-              placeholder="e.g. Muhammad Taimoor Yousaf"
+              placeholder="e.g. Anwar Shah"
               value={header.employeeName}
               onChange={(e) => updateHeader("employeeName", e.target.value)}
             />
@@ -109,12 +150,7 @@ export function ShiftLogForm() {
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="date">Date</Label>
-            <Input
-              id="date"
-              type="date"
-              value={header.date}
-              onChange={(e) => updateHeader("date", e.target.value)}
-            />
+            <Input id="date" type="date" value={header.date} onChange={(e) => updateHeader("date", e.target.value)} />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -159,50 +195,58 @@ export function ShiftLogForm() {
       <Card>
         <CardHeader>
           <CardTitle>Power Factor</CardTitle>
-          <CardDescription>Entered once here and applied to every POWER FACTOR row in the sheet.</CardDescription>
+          <CardDescription>Entered once here and pre-filled into every POWER FACTOR field below.</CardDescription>
         </CardHeader>
         <CardContent className="max-w-xs">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="powerFactor">Power Factor</Label>
-            <Input
-              id="powerFactor"
-              inputMode="decimal"
-              value={powerFactor}
-              onChange={(e) => setPowerFactor(e.target.value)}
+          <NumberField id="powerFactor" label="Power Factor" value={powerFactor} onChange={updatePowerFactor} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{gridGroup.title}</CardTitle>
+          <CardDescription>
+            The 220kV and 132kV Bus Bar 1 readings are pre-filled into every feeder&apos;s VOLTAGE KV field below.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {gridGroup.rows.map((row) => (
+            <NumberField
+              key={row.mp}
+              id={row.mp}
+              label={row.mpDescription === "VOLTAGE KV" ? `${row.equipment} Voltage` : row.mpDescription}
+              unit={row.unit}
+              value={fieldState.values[row.mp] ?? ""}
+              hint={DERIVED_HINTS[row.mp]}
+              onChange={(v) => setFieldValue(row.mp, v)}
             />
-          </div>
+          ))}
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
           <CardTitle>Readings</CardTitle>
-          <CardDescription>Enter the value for each measuring point, grouped by equipment.</CardDescription>
+          <CardDescription>Every measuring point, grouped by equipment.</CardDescription>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" className="w-full">
-            {EQUIPMENT_GROUPS.map((group) => (
+            {otherGroups.map((group) => (
               <AccordionItem key={group.id} value={group.id}>
                 <AccordionTrigger className="text-sm font-medium">{group.title}</AccordionTrigger>
                 <AccordionContent>
                   <div className="grid grid-cols-1 gap-4 pb-2 sm:grid-cols-2 lg:grid-cols-3">
-                    {group.rows
-                      .filter((row) => row.editable)
-                      .map((row) => (
-                        <div key={row.fieldKey} className="flex flex-col gap-1.5">
-                          <Label htmlFor={row.fieldKey}>
-                            {row.mpDescription}
-                            {row.unit ? <span className="text-muted-foreground"> ({row.unit})</span> : null}
-                          </Label>
-                          <Input
-                            id={row.fieldKey}
-                            inputMode="decimal"
-                            placeholder="0"
-                            value={values[row.fieldKey!] ?? ""}
-                            onChange={(e) => setValue(row.fieldKey!, e.target.value)}
-                          />
-                        </div>
-                      ))}
+                    {group.rows.map((row) => (
+                      <NumberField
+                        key={row.mp}
+                        id={row.mp}
+                        label={row.mpDescription}
+                        unit={row.unit}
+                        value={fieldState.values[row.mp] ?? ""}
+                        hint={DERIVED_HINTS[row.mp]}
+                        onChange={(v) => setFieldValue(row.mp, v)}
+                      />
+                    ))}
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -217,8 +261,7 @@ export function ShiftLogForm() {
             <CardTitle className="text-sm">Breaker &amp; Switch Status Rows</CardTitle>
             <CardDescription>
               {STATUS_ROWS.length} circuit breaker / disconnector / earth-switch rows are included in the export
-              with their template default values. Editable inputs for these will be added once the repeated
-              points are confirmed.
+              with their template default values.
             </CardDescription>
           </div>
           <Badge variant="secondary">{STATUS_ROWS.length} rows</Badge>
